@@ -46,5 +46,5 @@ def test_writable_mount_never_changes_host_permissions(tmp_path, monkeypatch):
     result = DockerSandbox("unit-test-image").run(spec)
     assert result.exit_code == 0
     assert stat.S_IMODE(out.stat().st_mode) == before == 0o700
-    assert ["--user", "1234:5678"] == calls[0][calls[0].index("--user"):][:2]
+    assert calls[0][calls[0].index("--user"):][:2] == ["--user", "1234:5678"]
     assert "type=bind,source=" in " ".join(calls[0])
