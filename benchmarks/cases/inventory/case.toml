@@ -1,0 +1,5 @@
+name = "inventory"
+difficulty = "easy"
+description = "Classic CRUD-style models: Config classes, pre/post validators, root_validator, dict/copy/parse_obj/from_orm, Optional fields without defaults."
+traps = []
+expected = "Deterministic codemods are sufficient; every gate should pass without an agent."

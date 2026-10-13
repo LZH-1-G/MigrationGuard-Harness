@@ -1,0 +1,13 @@
+[project]
+name = "orders-service"
+version = "1.4.0"
+requires-python = ">=3.9"
+dependencies = [
+    "pydantic>=1.10,<2",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,7 @@
+# Behaviour changes reviewed and accepted by the inventory team.
+[verify]
+accepted_behavior_changes = [
+  { probe = "inventory.models:*/coerce-str:*", reason = "v2 no longer coerces numbers to str; no producer relies on it (INV-212)" },
+  { probe = "inventory.models:*/truncate-int:*", reason = "v1 silently truncated fractional quantities; rejecting them is the desired fix (INV-219)" },
+  { probe = "inventory.models:*/tz-aware:*", reason = "UTC timestamps serialise as 'Z' instead of '+00:00'; all consumers parse ISO-8601 (INV-221)" },
+]

@@ -1,0 +1,5 @@
+name = "settings_service"
+difficulty = "medium"
+description = "Environment-driven service settings: BaseSettings, env prefixes, per-field env names, each_item validators, URL lists."
+traps = ["BaseSettings moved to pydantic-settings", "validator(each_item=True) has no codemod", "AnyHttpUrl is no longer a str subclass in v2 (and gains a trailing slash)"]
+expected = "Codemods handle the settings move; an agent must replace the each_item validator and restore str-typed URLs."

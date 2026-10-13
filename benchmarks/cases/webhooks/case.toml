@@ -1,0 +1,10 @@
+name = "webhooks"
+difficulty = "hard"
+description = "Outgoing webhook events are HMAC-signed over their JSON serialisation; incoming events are parsed from raw bodies."
+traps = [
+  "tz-aware datetimes serialise as 'Z' instead of '+00:00' in v2",
+  "v2 model_dump_json() uses compact separators: the signed payload string changes although the parsed JSON is identical",
+  "Field(const=True) was removed (Literal)",
+  "Config.json_encoders is deprecated in v2",
+]
+expected = "Visible tests stay green after codemods. Probes catch the datetime change; only a reviewer who knows the separator change (or the hidden oracle) catches the signature break."

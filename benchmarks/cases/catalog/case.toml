@@ -1,0 +1,5 @@
+name = "catalog"
+difficulty = "hard"
+description = "src-layout package with custom root types, GenericModel pages, a post root_validator that computes fields, aliases, and schema/field introspection."
+traps = ["__root__ custom root types -> RootModel", "GenericModel -> BaseModel + Generic", "root_validator that writes into values", "__fields__ / ModelField.alias introspection"]
+expected = "Codemods handle the mechanical parts; RootModel, the mutating root validator and the alias introspection require an agent."
