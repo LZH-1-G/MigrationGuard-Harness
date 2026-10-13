@@ -5,15 +5,15 @@ from __future__ import annotations
 import json
 
 import pytest
+from migrationguard.errors import BudgetExceeded, InvalidTransition, TransientError
+from migrationguard.report.render import check_claim
 from pydantic import ValidationError
 
 from migrationguard.config import BudgetSection, MigrationGuardConfig, RetrySection, deep_merge
-from migrationguard.errors import BudgetExceeded, InvalidTransition, TransientError
 from migrationguard.harness.events import EventLog
 from migrationguard.harness.state import BudgetTracker, RunState, check_transition, with_retries
 from migrationguard.harness.store import Store
 from migrationguard.models import AgentClaim, AgentResult, AgentUsage, GateResult, Phase
-from migrationguard.report.render import check_claim
 
 
 def state(**kw) -> RunState:
@@ -145,8 +145,9 @@ def test_config_load_and_overrides(tmp_path):
 
 
 def test_sdk_error_classification():
-    from migrationguard.agents.claude_sdk import classify_sdk_error
     from migrationguard.errors import AgentQuotaExceeded
+
+    from migrationguard.agents.claude_sdk import classify_sdk_error
 
     with pytest.raises(AgentQuotaExceeded):
         classify_sdk_error(RuntimeError("Claude Code returned an error result: You've hit your session limit · resets 5:50am"))

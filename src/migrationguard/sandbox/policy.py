@@ -20,9 +20,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
+from migrationguard.errors import PolicyViolation
+
 from migrationguard.analysis.project import matches_any
 from migrationguard.config import PolicySection
-from migrationguard.errors import PolicyViolation
 
 STARTUP_HOOK_NAMES = {
     "conftest.py",

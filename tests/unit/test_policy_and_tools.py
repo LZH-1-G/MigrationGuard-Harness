@@ -3,10 +3,10 @@ from __future__ import annotations
 import os
 
 import pytest
+from migrationguard.errors import PolicyViolation
 
 from migrationguard.agents.tools import AgentToolbox, ToolRuntime
 from migrationguard.config import PolicySection
-from migrationguard.errors import PolicyViolation
 from migrationguard.sandbox.policy import PermissionPolicy
 from tests.conftest import write_tree
 
