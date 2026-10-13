@@ -3,9 +3,9 @@ from __future__ import annotations
 import ast
 
 import pytest
+
 from migrationguard.sandbox.base import Bind, ExecSpec
 from migrationguard.sandbox.docker import DockerSandbox, default_image_tag
-
 from migrationguard.sandbox.envs import find_python
 from migrationguard.sandbox.local import LocalSandbox, _netns_available
 from tests.conftest import uv_available
