@@ -1,0 +1,5 @@
+name = "billing"
+difficulty = "trap"
+description = "Invoices fed by a CRM that sends numeric ids; JSON consumed by an accounting system that expects numbers."
+traps = ["v2 no longer coerces int -> str (customer_id from the CRM)", "Decimal serialises to a JSON string in v2 (v1: number)"]
+expected = "The visible tests pass after a naive codemod; only differential probes (or the hidden oracle) reveal the regressions. An agent must restore the old behaviour."
