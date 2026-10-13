@@ -51,7 +51,7 @@ migrationguard = "migrationguard.cli:main"
 mguard = "migrationguard.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/migrationguard/migrationguard"
+Homepage = "https://github.com/LZH-1-G/MigrationGuard-Harness"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/migrationguard"]
