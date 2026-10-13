@@ -30,7 +30,16 @@ from migrationguard.sandbox.base import ExecResult, ExecSpec, Sandbox
 from migrationguard.sandbox.envs import find_python
 
 CONTAINER_ROOT = "/mg"
-SANDBOX_UID = "65534:65534"
+def _host_unprivileged_user() -> str:
+    """Use the host owner's UID/GID so writable bind mounts need no chmod.
+
+    Refuse root hosts rather than granting container processes host-root identity.
+    Docker still drops capabilities and uses a read-only workspace/rootfs.
+    """
+    uid, gid = os.getuid(), os.getgid()
+    if uid == 0:
+        raise SandboxError("refusing Docker execution as host root; run MigrationGuard as a non-root user")
+    return f"{uid}:{gid}"
 
 
 def docker_binary() -> str | None:
@@ -72,7 +81,7 @@ class DockerSandbox(Sandbox):
         net = "bridge network" if self.allow_network else "no network"
         return (
             f"docker ({self.image}): {net}, read-only rootfs, cap-drop ALL, no-new-privileges, "
-            f"uid {SANDBOX_UID}, mem {self.memory}, cpus {self.cpus}, pids {self.pids_limit}"
+            f"host-mapped unprivileged uid/gid, mem {self.memory}, cpus {self.cpus}, pids {self.pids_limit}"
         )
 
     def check(self) -> tuple[bool, str]:
@@ -81,12 +90,17 @@ class DockerSandbox(Sandbox):
             return False, why
         if not image_exists(self.image):
             return False, f"runtime image {self.image} missing (run `migrationguard sandbox build-image`)"
+        try:
+            _host_unprivileged_user()
+        except SandboxError as exc:
+            return False, str(exc)
         return True, self.isolation
 
     def run(self, spec: ExecSpec) -> ExecResult:
         exe = docker_binary()
         if not exe:
             raise SandboxUnavailable("docker CLI not found")
+        container_user = _host_unprivileged_user()
         name = f"mg-{spec.label}-{uuid.uuid4().hex[:10]}"
         name = re.sub(r"[^a-zA-Z0-9_.-]", "-", name)
         mapping = {bind: f"{CONTAINER_ROOT}/{bind}" for bind in spec.binds}
@@ -101,7 +115,7 @@ class DockerSandbox(Sandbox):
             "--pids-limit", str(self.pids_limit),
             "--memory", self.memory,
             "--cpus", str(self.cpus),
-            "--user", SANDBOX_UID,
+            "--user", container_user,
             "-w", mapping.get(spec.cwd, "/tmp"),
             "-e", "HOME=/tmp", "-e", "TMPDIR=/tmp", "-e", "LANG=C.UTF-8",
             "-e", "PYTHONDONTWRITEBYTECODE=1", "-e", "PYTHONNOUSERSITE=1",
@@ -112,10 +126,12 @@ class DockerSandbox(Sandbox):
             cmd += ["-e", f"{key}={self.substitute(value, mapping)}"]
         for bind_name, bind in spec.binds.items():
             host = bind.host.resolve()
-            if not bind.readonly:
-                os.chmod(host, 0o777)
-            mode = "ro" if bind.readonly else "rw"
-            cmd += ["--mount", f"type=bind,source={host},target={mapping[bind_name]},{'readonly' if mode == 'ro' else ''}".rstrip(",")]
+            if not bind.readonly and (not host.is_dir() or not os.access(host, os.W_OK | os.X_OK)):
+                raise SandboxError(f"writable bind must be an accessible directory: {bind_name}")
+            mount = f"type=bind,source={host},target={mapping[bind_name]}"
+            if bind.readonly:
+                mount += ",readonly"
+            cmd += ["--mount", mount]
         cmd.append(self.image)
         cmd += [self.substitute(a, mapping) for a in spec.argv]
         start = time.monotonic()
