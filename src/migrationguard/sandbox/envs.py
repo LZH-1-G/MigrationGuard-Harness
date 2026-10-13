@@ -104,8 +104,10 @@ class EnvironmentProvisioner:
             tmpdir = Path(tmp)
             req_in = tmpdir / "requirements.in"
             req_in.write_text("\n".join(spec.requirements) + "\n", encoding="utf-8")
-            args = ["pip", "compile", str(req_in), "--python", str(interpreter), "--quiet", "--no-header",
-                    "--no-annotate", "-o", str(tmpdir / "lock.txt")]
+            # Never run arbitrary PEP 517 build hooks from untrusted source distributions on the host.
+            # Fail closed when a compatible prebuilt wheel does not exist.
+            args = ["pip", "compile", str(req_in), "--python", str(interpreter), "--no-build", "--quiet",
+                    "--no-header", "--no-annotate", "-o", str(tmpdir / "lock.txt")]
             if spec.constraints:
                 constraints = tmpdir / "constraints.txt"
                 constraints.write_text("\n".join(spec.constraints) + "\n", encoding="utf-8")
@@ -128,8 +130,9 @@ class EnvironmentProvisioner:
             lock_file = staging.parent / f"{lock_hash}.lock.txt"
             lock_file.write_text(lock_text, encoding="utf-8")
             proc = _uv(
-                ["pip", "install", "--quiet", "--python", str(interpreter), "--target", str(staging / "site"),
-                 "--no-deps", "-r", str(lock_file), "--link-mode", "copy", "--compile-bytecode"]
+                ["pip", "install", "--no-build", "--quiet", "--python", str(interpreter),
+                 "--target", str(staging / "site"), "--no-deps", "-r", str(lock_file),
+                 "--link-mode", "copy", "--compile-bytecode"]
             )
             if proc.returncode != 0:
                 raise EnvironmentProvisionError(

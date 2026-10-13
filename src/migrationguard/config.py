@@ -55,7 +55,7 @@ class EnvironmentSection(_Section):
 
 
 class SandboxSection(_Section):
-    backend: Literal["auto", "docker", "local"] = "auto"
+    backend: Literal["auto", "docker", "local"] = "docker"
     image: str = "migrationguard/runtime:py{python}"
     timeout_seconds: int = 900
     memory: str = "2g"
@@ -222,7 +222,7 @@ extra_requirements = ["pytest>=7,<9"]
 pytest_args = ["-q"]
 
 [sandbox]
-backend = "auto"          # auto | docker | local
+backend = "docker"        # safe default; local/auto require explicit opt-in
 timeout_seconds = 900
 
 [verify]

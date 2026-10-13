@@ -1,5 +1,9 @@
 # MigrationGuard
 
+[![CI](https://github.com/LZH-1-G/MigrationGuard-Harness/actions/workflows/ci.yml/badge.svg)](https://github.com/LZH-1-G/MigrationGuard-Harness/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/LZH-1-G/MigrationGuard-Harness?include_prereleases)](https://github.com/LZH-1-G/MigrationGuard-Harness/releases)
+
 **An evidence-driven agent harness for safe dependency migration.**
 MigrationGuard migrates Python projects from Pydantic v1 to v2 with deterministic codemods
 and Claude agents, and accepts the result only when sandboxed, differential evidence
@@ -80,12 +84,16 @@ general accuracy claim. The ground-truth oracle has blind spots of its own (see
 
 ## Installation
 
-Requirements: Linux (tested; macOS should work but is untested), Python ≥ 3.10 (tested on 3.12), git. Docker is recommended (the strongest
-sandbox); without it MigrationGuard falls back to a process sandbox. `uv` is installed as a
-Python dependency and manages the baseline/target interpreters and packages.
+Requirements: Linux (tested in CI on Python 3.10 and 3.12; macOS untested), Python ≥ 3.10,
+git, and **Docker** for default execution. The process-only sandbox is a weaker, explicit
+opt-in (`--sandbox local`); `--sandbox auto` additionally allows fallback to it. Neither
+process isolation nor host-side dependency resolution should be treated as safe for fully
+untrusted repositories. `uv` is installed as a Python dependency and manages the
+baseline/target interpreters and packages. Source-distribution builds are disabled during
+host-side dependency provisioning: dependencies without compatible wheels now fail closed.
 
 ```bash
-git clone https://github.com/<you>/migrationguard && cd migrationguard
+git clone https://github.com/LZH-1-G/MigrationGuard-Harness.git && cd MigrationGuard-Harness
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[agent]"            # or ".[dev]" for tests and linters
 
@@ -141,7 +149,7 @@ pytest_args = ["-q"]
 exclude_newer = "2026-06-01"       # reproducible dependency resolution
 
 [sandbox]
-backend = "auto"                   # docker if the image exists, else local
+backend = "docker"                 # safe default; auto/local explicitly opt into weaker fallback
 timeout_seconds = 900
 network = false
 
@@ -172,20 +180,37 @@ sides of the migration and must return identical values. See
 
 ## How it works
 
-```
-INIT → ANALYZE → BASELINE → PLAN → CODEMOD → VERIFY ⇄ REPAIR (Claude)
-                                               ↓
-                                             REVIEW (independent Claude, read-only, veto)
-                                               ↓
-                                             DECIDE → ACCEPTED | REJECTED
-any phase → PAUSED (budget / interrupt; resumable) | FAILED
+```mermaid
+flowchart TD
+    A[Git repository + Pydantic v1] --> B[Analyze and plan]
+    B --> C[Baseline in isolated environment]
+    C --> D[Deterministic libcst codemods]
+    D --> E[Claude Agent SDK repair]
+    E --> F[Sandbox tests + differential probes]
+    F --> G{Evidence gates pass?}
+    G -- No, budget remains --> E
+    G -- Yes --> H[Independent reviewer]
+    H --> I{Approved?}
+    I -- Needs repair --> E
+    I -- Approved --> J[Accepted patch + report]
+    G -- Unsafe or exhausted --> K[Rejected or paused]
+    B -. checkpoint .-> L[(SQLite checkpoints)]
+    E -. checkpoint .-> L
+    F -. checkpoint .-> L
+    L -. resume .-> E
 ```
 
+**Demo:** Run [`examples/demo.sh`](examples/demo.sh) from a Linux checkout for the
+codemod-only path; run `examples/demo.sh --claude` for the paid Claude repair path.
+See [architecture](docs/architecture.md), [verification evidence](docs/VERIFICATION.md)
+and [benchmarks](benchmarks/RESULTS.md).
+
 * **Isolation.** Two git worktrees (target branch + detached baseline). Tests and probes
-  run in Docker (`--network none`, read-only rootfs and workspace, uid 65534, all
-  capabilities dropped, memory/cpu/pids limits) or a process sandbox (throwaway copy,
-  scrubbed env, rlimits, network namespace). Dependencies come from content-addressed uv
-  installs mounted read-only.
+  run in Docker (`--network none`, read-only rootfs and workspace, non-root host-mapped UID, all
+  capabilities dropped, memory/cpu/pids limits) or an explicitly selected process sandbox
+  (throwaway copy, scrubbed env, rlimits, network namespace where available). Writable
+  Docker output directories retain their original host permissions; dependency installs
+  use prebuilt wheels only and are mounted read-only for test execution.
 * **Codemods.** A libcst transformer with a project-wide symbol index (models through
   inherited bases, field types, function return types) so `.dict()`/`.json()`/`.copy()` are
   only rewritten on receivers known to be models. Constructs needing judgement
@@ -245,7 +270,16 @@ Fault injection for resilience testing: `MIGRATIONGUARD_FAULT=verify:crash` (har
   project's tests. Code paths neither exercises can still change unnoticed; the reviewer
   agent is the last line, and it is not deterministic.
 * The local sandbox is weaker than Docker (no filesystem isolation beyond working on a
-  copy; network isolation needs unprivileged user namespaces).
+  copy; network isolation needs unprivileged user namespaces). Docker is the default;
+  `local` and `auto` are explicit opt-ins. For an untrusted repository, pass
+  `--sandbox docker` explicitly because repository-supplied configuration can request a
+  weaker backend or allow network access.
+* Dependency resolution and wheel installation still happen on the host. Arbitrary
+  source builds are disabled, but downloaded wheel artifacts and indexes are not a
+  complete supply-chain trust boundary; use a disposable host/VM for truly untrusted code.
+* Docker output mounts use the invoking non-root UID/GID, so write access requires that
+  UID to own (or otherwise have access to) the output directory. Running the tool as host
+  root is intentionally rejected by the Docker executor.
 * Projects whose tests need network services (databases, HTTP) need
   `sandbox.network = true` or service containers, which are not provided.
 

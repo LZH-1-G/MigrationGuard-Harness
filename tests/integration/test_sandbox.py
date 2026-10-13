@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import os
+import stat
 
 import pytest
 
@@ -100,4 +102,18 @@ def test_docker_sandbox_cannot_write_rootfs_and_runs_unprivileged(tmp_path):
         "print('uid', os.getuid())\n"
     )
     result = sb.run(spec)
-    assert "rootfs read-only" in result.stdout and "uid 65534" in result.stdout
+    assert "rootfs read-only" in result.stdout
+    assert os.getuid() != 0
+    assert f"uid {os.getuid()}" in result.stdout
+
+
+@pytest.mark.docker
+def test_docker_preserves_host_output_permissions(tmp_path):
+    sb = _docker()
+    _, out, spec = _spec(tmp_path)
+    out.chmod(0o700)
+    mode_before = stat.S_IMODE(out.stat().st_mode)
+    result = sb.run(spec)
+    assert result.exit_code == 0, result.stderr
+    assert (out / "result.txt").read_text() == "ok"
+    assert stat.S_IMODE(out.stat().st_mode) == mode_before == 0o700
